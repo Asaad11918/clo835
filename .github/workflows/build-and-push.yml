@@ -1,16 +1,21 @@
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 name: Build & Push App to ECR
 on:
+  on:
   push:
     branches: [ "main", "master" ]
     paths-ignore:
-      - ".github/workflows/**"  # prevents runs when you edit diagnose-aws.yml or any workflow
-      - "mysql/**"              # keeps MySQL independent
+      - ".github/workflows/**"   # don’t run when editing workflows
+      - "mysql/**"               # keep MySQL independent
   pull_request:
     branches: [ "main" ]
     paths-ignore:
       - ".github/workflows/**"
       - "mysql/**"
   workflow_dispatch: {}
+
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
