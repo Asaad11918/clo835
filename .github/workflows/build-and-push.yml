@@ -1,10 +1,9 @@
-name: Build & Push App to ECR
 on:
   push:
     branches: [ "main", "master" ]
     paths-ignore:
-      - ".github/workflows/**"
-      - "mysql/**"
+      - ".github/workflows/**"   # editing workflows won't trigger app
+      - "mysql/**"               # keep MySQL independent
   pull_request:
     branches: [ "main" ]
     paths-ignore:
@@ -15,49 +14,4 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-
-
-env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-  ECR_REPO: ${{ vars.ECR_REPO_APP }}
-
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}   # keep if you use temp creds
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Preflight ECR permission check
-        run: |
-          aws sts get-caller-identity
-          aws ecr get-authorization-token --output json >/dev/null
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, tag, and push app
-        run: |
-          IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}
-          GIT_SHA=${{ github.sha }}
-          TS=$(date +%Y%m%d%H%M%S)
-
-          docker build -t ${ECR_REPO}:latest -t ${ECR_REPO}:${GIT_SHA} -t ${ECR_REPO}:${TS} .
-          docker tag ${ECR_REPO}:latest ${IMAGE_URI}:latest
-          docker tag ${ECR_REPO}:${GIT_SHA} ${IMAGE_URI}:${GIT_SHA}
-          docker tag ${ECR_REPO}:${TS} ${IMAGE_URI}:${TS}
-
-          docker push ${IMAGE_URI}:latest
-          docker push ${IMAGE_URI}:${GIT_SHA}
-          docker push ${IMAGE_URI}:${TS}
 
