@@ -1,7 +1,16 @@
 name: Diagnose AWS/ECR
 on:
-  workflow_dispatch: {}   # ONLY manual runs
-# remove any 'push:' block  
+  push:
+    branches: [ "main", "master" ]
+    paths-ignore:
+      - ".github/workflows/**"  # prevents runs when you edit diagnose-aws.yml or any workflow
+      - "mysql/**"              # keeps MySQL independent
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:
+      - ".github/workflows/**"
+      - "mysql/**"
+  workflow_dispatch: {}
 
   push:
     branches: [ "main" ]
