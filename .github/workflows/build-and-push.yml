@@ -1,16 +1,15 @@
 name: Build & Push App to ECR
-
 on:
   push:
     branches: [ "main", "master" ]
-    paths:
-      - "**"
-      - "!mysql/**"      # app-only changes trigger this
+    paths-ignore:
+      - ".github/workflows/**"  # prevents runs when you edit diagnose-aws.yml or any workflow
+      - "mysql/**"              # keeps MySQL independent
   pull_request:
     branches: [ "main" ]
-    paths:
-      - "**"
-      - "!mysql/**"
+    paths-ignore:
+      - ".github/workflows/**"
+      - "mysql/**"
   workflow_dispatch: {}
 
 env:
