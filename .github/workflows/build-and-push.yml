@@ -1,17 +1,40 @@
+name: Build and Push to ECR
+
 on:
   push:
-    branches: [ "main", "master" ]
-    paths-ignore:
-      - ".github/workflows/**"   # editing workflows won't trigger app
-      - "mysql/**"               # keep MySQL independent
+    branches: [main, master]
   pull_request:
-    branches: [ "main" ]
-    paths-ignore:
-      - ".github/workflows/**"
-      - "mysql/**"
-  workflow_dispatch: {}
+    branches: [main]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push webapp (./app)
+        run: |
+          WEB_URI=${{ secrets.ECR_WEB_URI }}
+          docker build -t webapp:latest ./app
+          docker tag webapp:latest ${WEB_URI}:latest
+          docker push ${WEB_URI}:latest
+
+      - name: Build & push mysql (./mysql)
+        run: |
+          MYSQL_URI=${{ secrets.ECR_MYSQL_URI }}
+          docker build -t mysql:custom ./mysql
+          docker tag mysql:custom ${MYSQL_URI}:latest
+          docker push ${MYSQL_URI}:latest
 
