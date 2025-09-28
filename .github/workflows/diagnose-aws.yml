@@ -1,6 +1,7 @@
 name: Diagnose AWS/ECR
 on:
-  workflow_dispatch: {}   
+  workflow_dispatch: {}   # ONLY manual runs
+# remove any 'push:' block  
 
   push:
     branches: [ "main" ]
