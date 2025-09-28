@@ -1,0 +1,42 @@
+name: Diagnose AWS/ECR
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [ "main" ]
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo inputs
+        run: |
+          echo "Region=${AWS_REGION}"
+          echo "Account=${AWS_ACCOUNT_ID}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}   # keep if you use temp creds
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Preflight ECR permission
+        run: aws ecr get-authorization-token --output json >/dev/null
+
+      - name: Docker sanity
+        run: |
+          docker --version
+          echo "ok" | docker build -t diag -f - . <<'EOF'
+          FROM alpine:3.19
+          CMD ["echo","docker-ok"]
+          EOF
+          docker run --rm diag
