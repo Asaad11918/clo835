@@ -1,20 +1,21 @@
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 name: Build & Push App to ECR
 on:
-  on:
   push:
     branches: [ "main", "master" ]
     paths-ignore:
-      - ".github/workflows/**"   # don’t run when editing workflows
-      - "mysql/**"               # keep MySQL independent
+      - ".github/workflows/**"
+      - "mysql/**"
   pull_request:
     branches: [ "main" ]
     paths-ignore:
       - ".github/workflows/**"
       - "mysql/**"
   workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 
 
 env:
