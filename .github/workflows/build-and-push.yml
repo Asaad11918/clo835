@@ -37,6 +37,3 @@ jobs:
           docker build -f Dockerfile_mysql -t "$MYSQL_URI:latest" .
           docker push "$MYSQL_URI:latest"
 
-
-
-
