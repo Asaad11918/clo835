@@ -2,27 +2,19 @@ name: Build & Push App to ECR
 
 on:
   push:
-    branches: ["main", "master"]
-    paths:
-      - "**"
-      - "!mysql/**"
+    branches: ["main","master"]
   pull_request:
     branches: ["main"]
-    paths:
-      - "**"
-      - "!mysql/**"
   workflow_dispatch: {}
 
 env:
-  # Optional repo variables; workflow will fall back if absent
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-  ECR_REPO: ${{ vars.ECR_REPO_APP || 'clo835-webapp' }}
+  ECR_REPO:   ${{ vars.ECR_REPO_APP || 'clo835-webapp' }}
+  APP_DIR:    assignment_docker
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,16 +27,14 @@ jobs:
           aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region:            ${{ env.AWS_REGION }}
 
-      - name: Resolve AWS account and image URI
+      - name: Resolve account + image URI
         id: resolve
         shell: bash
         run: |
-          ACCOUNT="${AWS_ACCOUNT_ID}"
-          if [ -z "$ACCOUNT" ]; then
-            ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-          fi
-          echo "account_id=$ACCOUNT" >> $GITHUB_OUTPUT
-          echo "image_uri=${ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+          echo "image_uri=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> $GITHUB_OUTPUT
 
       - name: Ensure ECR repository exists
         shell: bash
@@ -57,18 +47,20 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build, tag, and push
+        working-directory: ${{ env.APP_DIR }}
         shell: bash
+        env:
+          IMAGE_URI: ${{ steps.resolve.outputs.image_uri }}
         run: |
           set -euo pipefail
-          IMAGE_URI="${{ steps.resolve.outputs.image_uri }}"
           GIT_SHA="${{ github.sha }}"
           TS="$(date +%Y%m%d%H%M%S)"
 
-          # Build local tags
+          # Build from app directory
           docker build -t "${ECR_REPO}:latest" -t "${ECR_REPO}:${GIT_SHA}" -t "${ECR_REPO}:${TS}" .
 
-          # Map to remote ECR tags
-          docker tag "${ECR_REPO}:latest"   "${IMAGE_URI}:latest"
+          # Tag to full ECR URI
+          docker tag "${ECR_REPO}:latest"     "${IMAGE_URI}:latest"
           docker tag "${ECR_REPO}:${GIT_SHA}" "${IMAGE_URI}:${GIT_SHA}"
           docker tag "${ECR_REPO}:${TS}"      "${IMAGE_URI}:${TS}"
 
