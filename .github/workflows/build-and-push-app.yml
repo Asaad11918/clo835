@@ -2,53 +2,81 @@ name: Build & Push App to ECR
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
     paths:
       - "**"
       - "!mysql/**"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
       - "**"
       - "!mysql/**"
   workflow_dispatch: {}
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
+  # Optional repo variables; workflow will fall back if absent
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-  ECR_REPO: ${{ vars.ECR_REPO_APP }}
+  ECR_REPO: ${{ vars.ECR_REPO_APP || 'clo835-webapp' }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ env.AWS_REGION }}
 
-      - name: Who am I
-        run: aws sts get-caller-identity
+      - name: Resolve AWS account and image URI
+        id: resolve
+        shell: bash
+        run: |
+          ACCOUNT="${AWS_ACCOUNT_ID}"
+          if [ -z "$ACCOUNT" ]; then
+            ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          fi
+          echo "account_id=$ACCOUNT" >> $GITHUB_OUTPUT
+          echo "image_uri=${ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}" >> $GITHUB_OUTPUT
+
+      - name: Ensure ECR repository exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecr describe-repositories --repository-names "${{ env.ECR_REPO }}" >/dev/null 2>&1 || \
+          aws ecr create-repository --repository-name "${{ env.ECR_REPO }}" >/dev/null
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push app
+      - name: Build, tag, and push
+        shell: bash
         run: |
-          IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}
-          GIT_SHA=${{ github.sha }}
-          TS=$(date +%Y%m%d%H%M%S)
+          set -euo pipefail
+          IMAGE_URI="${{ steps.resolve.outputs.image_uri }}"
+          GIT_SHA="${{ github.sha }}"
+          TS="$(date +%Y%m%d%H%M%S)"
 
-          docker build -t ${ECR_REPO}:latest -t ${ECR_REPO}:${GIT_SHA} -t ${ECR_REPO}:${TS} .
-          docker tag ${ECR_REPO}:latest ${IMAGE_URI}:latest
-          docker tag ${ECR_REPO}:${GIT_SHA} ${IMAGE_URI}:${GIT_SHA}
-          docker tag ${ECR_REPO}:${TS} ${IMAGE_URI}:${TS}
+          # Build local tags
+          docker build -t "${ECR_REPO}:latest" -t "${ECR_REPO}:${GIT_SHA}" -t "${ECR_REPO}:${TS}" .
 
-          docker push ${IMAGE_URI}:latest
-          docker push ${IMAGE_URI}:${GIT_SHA}
-          docker push ${IMAGE_URI}:${TS}
+          # Map to remote ECR tags
+          docker tag "${ECR_REPO}:latest"   "${IMAGE_URI}:latest"
+          docker tag "${ECR_REPO}:${GIT_SHA}" "${IMAGE_URI}:${GIT_SHA}"
+          docker tag "${ECR_REPO}:${TS}"      "${IMAGE_URI}:${TS}"
+
+          # Push
+          docker push "${IMAGE_URI}:latest"
+          docker push "${IMAGE_URI}:${GIT_SHA}"
+          docker push "${IMAGE_URI}:${TS}"
+
+      - name: Who am I (audit)
+        run: aws sts get-caller-identity
+
