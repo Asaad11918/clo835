@@ -87,6 +87,14 @@ resource "aws_instance" "web" {
               yum install -y unzip
               unzip awscliv2.zip
               ./aws/install
+              sudo systemctl enable docker
+              sudo systemctl start docker 
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              sudo mv kubectl /usr/local/bin/
+              curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+              chmod +x kind
+              sudo mv kind /usr/local/bin/
               EOF
 
   tags = {

@@ -3,10 +3,10 @@ variable "aws_region" {
 }
 
 variable "instance_type" {
-  default = "t2.small"
+  default = "t2.large"
 }
 
 variable "key_name" {
-  default     = "CLO_assignment"
+  default     = "ec2-clo835"
   description = "EC2 Key Pair name for SSH"
 }
