@@ -3,7 +3,7 @@ variable "aws_region" {
 }
 
 variable "instance_type" {
-  default = "t2.large"
+  default = "t2.medium"
 }
 
 variable "key_name" {
